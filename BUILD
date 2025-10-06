@@ -1,4 +1,4 @@
-apt install git wget curl snapd
+apt install git wget curl snapd debootstrap
 
 cd /
 
@@ -11,5 +11,6 @@ snap install distrobuilder --classic
 export PATH=/snap/bin:$PATH
 
 mkdir ./build
+
 
 distrobuilder build-lxc /lxc-ci/images/debian.yaml ./build -o image.architecture=arm64 -o image.release=bookworm -o image.variant=default -o source.url=http://ftp.us.debian.org/debian
