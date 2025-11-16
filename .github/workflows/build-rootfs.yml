@@ -1,0 +1,97 @@
+name: build-arm64-rootfs
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Debian release codename to build (e.g., bookworm)
+        required: true
+        default: bookworm
+      variant:
+        description: Distrobuilder variant to build (default or cloud)
+        required: true
+        default: default
+      source_url:
+        description: Debian mirror URL
+        required: true
+        default: https://deb.debian.org/debian
+  workflow_call:
+    inputs:
+      release:
+        description: Debian release codename to build (e.g., bookworm)
+        required: false
+        default: bookworm
+        type: string
+      variant:
+        description: Distrobuilder variant to build (default or cloud)
+        required: false
+        default: default
+        type: string
+      source_url:
+        description: Debian mirror URL
+        required: false
+        default: https://deb.debian.org/debian
+        type: string
+
+jobs:
+  build:
+    name: Build Debian rootfs (${{ env.DEBIAN_RELEASE }} / ${{ env.IMAGE_VARIANT }})
+    runs-on: ubuntu-24.04-arm
+    env:
+      DEBIAN_RELEASE: ${{ inputs.release || 'bookworm' }}
+      IMAGE_VARIANT: ${{ inputs.variant || 'default' }}
+      SOURCE_URL: ${{ inputs.source_url || 'https://deb.debian.org/debian' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates \
+            debootstrap \
+            gpg \
+            golang-go \
+            rsync \
+            squashfs-tools \
+            uidmap \
+            wget \
+            xz-utils
+
+      - name: Install distrobuilder
+        run: |
+          set -euxo pipefail
+          go install github.com/lxc/distrobuilder/distrobuilder@latest
+          sudo install -o root -g root -m 0755 "$HOME/go/bin/distrobuilder" /usr/local/bin/distrobuilder
+          distrobuilder --version
+
+      - name: Build LXC rootfs
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts
+          sudo distrobuilder build-lxc ./debian.yaml artifacts \
+            -o image.architecture=arm64 \
+            -o image.release="${DEBIAN_RELEASE}" \
+            -o image.variant="${IMAGE_VARIANT}" \
+            -o source.url="${SOURCE_URL}"
+          sudo chown -R "$USER:$USER" artifacts
+
+      - name: Package outputs
+        run: |
+          set -euxo pipefail
+          OUTPUT_PREFIX="debian-${DEBIAN_RELEASE}-${IMAGE_VARIANT}-arm64"
+          mkdir -p release
+          for file in artifacts/*; do
+            base="$(basename "$file")"
+            mv "$file" "release/${OUTPUT_PREFIX}-${base}"
+          done
+          (cd release && sha256sum * > SHA256SUMS.txt)
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-rootfs-${{ env.DEBIAN_RELEASE }}-${{ env.IMAGE_VARIANT }}-arm64
+          path: release/
+          retention-days: 14
