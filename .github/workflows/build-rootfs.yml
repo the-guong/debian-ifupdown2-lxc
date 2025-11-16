@@ -35,7 +35,7 @@ on:
 
 jobs:
   build:
-    name: Build Debian rootfs (${{ env.DEBIAN_RELEASE }} / ${{ env.IMAGE_VARIANT }})
+    name: Build Debian rootfs (${{ inputs.release || 'bookworm' }} / ${{ inputs.variant || 'default' }})
     runs-on: ubuntu-24.04-arm
     env:
       DEBIAN_RELEASE: ${{ inputs.release || 'bookworm' }}
@@ -92,6 +92,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: debian-rootfs-${{ env.DEBIAN_RELEASE }}-${{ env.IMAGE_VARIANT }}-arm64
+          name: debian-rootfs-${{ inputs.release || 'bookworm' }}-${{ inputs.variant || 'default' }}-arm64
           path: release/
           retention-days: 14
