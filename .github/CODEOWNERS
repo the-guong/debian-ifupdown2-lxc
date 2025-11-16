@@ -1,0 +1,11 @@
+# CODEOWNERS — define who should review changes to this repository.
+#
+# Format: <pattern> <owner> [<owner> ...]
+# Example: `* @org/team` or `docs/ @username`
+#
+# Default owner for the whole repository
+* @the-guong
+
+# Optional: uncomment and adjust the lines below to assign owners to specific paths
+## BUILD @the-guong
+## debian.yaml @the-guong
