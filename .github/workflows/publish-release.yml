@@ -1,0 +1,75 @@
+name: publish-arm64-rootfs-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Debian release codename to build (e.g., bookworm)
+        required: true
+        default: bookworm
+      variant:
+        description: Distrobuilder variant to build (default or cloud)
+        required: true
+        default: default
+      source_url:
+        description: Debian mirror URL
+        required: true
+        default: https://deb.debian.org/debian
+      tag_name:
+        description: Git tag to create or update for this release (e.g., v2024.11.01)
+        required: true
+      release_name:
+        description: Human-friendly release name (leave blank to auto-generate)
+        required: false
+        default: ""
+      release_body:
+        description: Release notes / changelog (supports Markdown)
+        required: false
+        default: ""
+      draft:
+        description: Mark the GitHub Release as a draft
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: Mark the GitHub Release as a pre-release
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-rootfs:
+    uses: ./.github/workflows/build-rootfs.yml
+    with:
+      release: ${{ inputs.release }}
+      variant: ${{ inputs.variant }}
+      source_url: ${{ inputs.source_url }}
+
+  publish:
+    name: Publish GitHub Release
+    needs: build-rootfs
+    runs-on: ubuntu-latest
+    env:
+      ARTIFACT_NAME: debian-rootfs-${{ inputs.release }}-${{ inputs.variant }}-arm64
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: dist
+
+      - name: Display artifact contents
+        run: |
+          set -euxo pipefail
+          ls -al dist
+          sha256sum dist/*
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          name: ${{ inputs.release_name != '' && inputs.release_name || format('Debian {0} ({1}) arm64 rootfs', inputs.release, inputs.variant) }}
+          body: ${{ inputs.release_body }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          files: dist/**
